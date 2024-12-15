@@ -1,69 +1,41 @@
-import serial
-import speech_recognition as sr
-import pyttsx3
+#include <Servo.h>
 
-# Initialize serial communication with Arduino
-arduino = serial.Serial('COM5', 9600, timeout=1)  # Replace 'COM3' with your Arduino's port
+// Define pins
+const int relayPin = 7;   // Relay control pin
+Servo servoMotor;         // Servo motor
 
-# Predefined code word
-CODE_WORD = "open"  # Set your desired code word
+void setup() {
+  // Initialize serial communication
+  Serial.begin(9600);
 
-# Initialize text-to-speech
-engine = pyttsx3.init()
-engine.setProperty('rate', 150)  # Speed of speech
-engine.setProperty('voice', 'english')  # Set voice
+  // Initialize relay pin as output
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW); // Initially lock is OFF
 
-# Function to send commands to Arduino
-def send_command(command):
-    arduino.write((command + '\n').encode())
-    response = arduino.readline().decode().strip()
-    print(f"Arduino Response: {response}")
-    engine.say(f"Arduino says {response}")
-    engine.runAndWait()
+  // Attach servo to pin
+  servoMotor.attach(9);
+  servoMotor.write(0); // Initial position of servo lock
 
-# Function to recognize voice input
-def recognize_speech():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening for your command...")
-        engine.say("Listening for your command")
-        engine.runAndWait()
-        try:
-            audio = recognizer.listen(source, timeout=5)  # Listen for 5 seconds
-            command = recognizer.recognize_google(audio).lower()
-            print(f"You said: {command}")
-            return command
-        except sr.UnknownValueError:
-            print("Sorry, I could not understand your voice.")
-            engine.say("Sorry, I could not understand your voice.")
-            engine.runAndWait()
-            return None
-        except sr.RequestError as e:
-            print(f"Could not request results; {e}")
-            return None
+  Serial.println("System ready...");
+}
 
-# Main loop for handling commands
-while True:
-    # Listen for the initial command
-    voice_command = recognize_speech()
-    if voice_command in ["unlock", "lock"]:
-        if voice_command == "unlock":
-            # Ask for the code word
-            engine.say("Please say the code word")
-            engine.runAndWait()
-            code_word_input = recognize_speech()  # Capture the code word in voice
-            if code_word_input == CODE_WORD:
-                send_command("UNLOCK")
-            else:
-                engine.say("Incorrect code word")
-                engine.runAndWait()
-                print("Incorrect code word!")
-        elif voice_command == "lock":
-            send_command("LOCK")
-    else:
-        engine.say("Invalid command. Please say unlock or lock.")
-        engine.runAndWait()
-        print("Invalid command. Please say unlock or lock.")
+void loop() {
+  // Listen for commands via Serial/ESP8266
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();  // Remove extra spaces/newlines
+
+    if (command == "UNLOCK") {
+      digitalWrite(relayPin, HIGH);  // Activate solenoid lock
+      servoMotor.write(90);          // Unlock using servo (optional)
+      Serial.println("Locker unlocked");
+    } else if (command == "LOCK") {
+      digitalWrite(relayPin, LOW);   // Deactivate solenoid lock
+      servoMotor.write(0);           // Lock position using servo
+      Serial.println("Locker locked");
+    }
+  }
+}
 
 
 
